@@ -27,4 +27,4 @@ jobs:
     - name: Earthly version
       run: earthly --version
     - name: Run build
-      run: earthly --allow-privileged +test-all
+      run: earthly --allow-privileged +test-python3.6
