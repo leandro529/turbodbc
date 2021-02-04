@@ -10,103 +10,116 @@ os-base:
     ENV PATH=/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
     RUN apt-get update && apt-get upgrade -y && \
-        apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev \
-        libssl-dev libreadline-dev libffi-dev libsqlite3-dev \
+        apt-get install -y build-essential zlib1g-dev \
         wget unixodbc unixodbc-dev libboost-all-dev cmake g++ \
         odbc-postgresql postgresql-client ninja-build gnupg apt-transport-https && \
         apt-get clean
 
-    # hack to cache the docker setup and the image pull
-    WITH DOCKER --pull postgres:11 --pull mysql:8 --pull mcr.microsoft.com/mssql/server:2019-latest
-        RUN echo ""
-    END
-
-
 driver:
-    ARG PYTHON_VERSION=3.8.6
     ARG CODE_NAME=focal
     FROM --build-arg CODE_NAME="$CODE_NAME" +os-base
 
-    # install the mysql odbc driver in /opt
+    # we need an mysql odbc driver for the integration tests
+    # currently the test fail with a newer driver
     RUN cd /opt && \
-        wget -q https://dev.mysql.com/get/Downloads/Connector-ODBC/8.0/mysql-connector-odbc-8.0.23-linux-glibc2.12-x86-64bit.tar.gz && \
-        echo "9b90199bfc8d09a18e1748e979593469 mysql-connector-odbc-8.0.23-linux-glibc2.12-x86-64bit.tar.gz" | md5sum -c - && \
-        tar xzf mysql-connector-odbc-8.0.23-linux-glibc2.12-x86-64bit.tar.gz && \
-        /opt/mysql-connector-odbc-8.0.23-linux-glibc2.12-x86-64bit/bin/myodbc-installer -d -a -n MySQL -t DRIVER=`ls /opt/mysql-*/lib/libmyodbc*w.so` && \
+        wget -q https://downloads.mysql.com/archives/get/p/10/file/mysql-connector-odbc-5.1.13-linux-glibc2.5-x86-64bit.tar.gz && \
+        tar xzf mysql-connector-odbc-5.1.13-linux-glibc2.5-x86-64bit.tar.gz && \
+        mysql-connector-odbc-5.1.13-linux-glibc2.5-x86-64bit/bin/myodbc-installer -d -a -n MySQL -t DRIVER=`ls /opt/mysql-*/lib/libmyodbc*w.so` && \
         rm /opt/*.tar.gz
 
-    # install the mssql odbc driver:
+    # we need an mssql odbc driver for the integration tests
     RUN wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | apt-key add - && \
         wget -q https://packages.microsoft.com/config/debian/9/prod.list -O- > /etc/apt/sources.list.d/mssql-release.list && \
         apt-get update && \
         ACCEPT_EULA=Y apt-get install msodbcsql17 mssql-tools && \
         odbcinst -i -d -f /opt/microsoft/msodbcsql17/etc/odbcinst.ini
 
-    # install the exasol odbc driver:
-    RUN cd /opt && \
-        wget -q https://www.exasol.com/support/secure/attachment/111075/EXASOL_ODBC-6.2.9.tar.gz && \
-        tar xzf EXASOL_ODBC-6.2.9.tar.gz && \
-        echo "\n[EXASOL]\nDriver=`ls /opt/EXA*/lib/linux/x86_64/libexaodbc-uo2214lv1.so`\nThreading=2\n" >> /etc/odbcinst.ini && \
-        rm /opt/*.tar.gz
+    # not used for the moment as Exasol is not tested here
+    # RUN cd /opt && \
+    #     wget -q https://www.exasol.com/support/secure/attachment/111075/EXASOL_ODBC-6.2.9.tar.gz && \
+    #     tar xzf EXASOL_ODBC-6.2.9.tar.gz && \
+    #     echo "\n[EXASOL]\nDriver=`ls /opt/EXA*/lib/linux/x86_64/libexaodbc-uo2214lv1.so`\nThreading=2\n" >> /etc/odbcinst.ini && \
+    #     rm /opt/*.tar.gz
+
+docker-cache:
+    ARG CODE_NAME=focal
+    FROM --build-arg CODE_NAME="$CODE_NAME" \
+        +driver
+
+    # hack to cache the docker setup and the image pull so later steps based on the same OS have this already included
+    # this should be in sync with earth/docker-compose.yml
+    WITH DOCKER --pull postgres:11 --pull mysql:5.6 --pull mcr.microsoft.com/mssql/server:2017-latest
+        RUN echo ""
+    END
 
 python:
     ARG PYTHON_VERSION=3.8.6
     ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
-    ARG PANDAS_VERSION_RULE=""
+    FROM --build-arg CODE_NAME="$CODE_NAME" +docker-cache
 
-    FROM --build-arg CODE_NAME="$CODE_NAME" +driver
-
-    RUN apt-get upgrade -y python`echo "$PYTHON_VERSION" | sed 's/\.[^\.]*$//'`-dev
+    ENV MINICONDA_URL="https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh"
     RUN cd /opt && \
-        wget -q https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz
+        wget --no-verbose -O miniconda.sh $MINICONDA_URL && chmod +x miniconda.sh
+    ENV MINICONDA=$HOME/miniconda
     RUN cd /opt && \
-        tar xf Python-$PYTHON_VERSION.tgz && \
-        cd Python-$PYTHON_VERSION && \
-        ./configure -enable-optimizations --enable-shared && \
-        make -j4 install
-    RUN python3 --version
+        ./miniconda.sh -b -p $MINICONDA && \
+        . $MINICONDA/etc/profile.d/conda.sh && \
+        conda config --remove channels defaults && \
+        conda config --add channels conda-forge && \
+        conda create -y -q -n turbodbc-dev \
+        gcc_linux-64 \
+        make \
+        ninja \
+        cmake \
+        coveralls \
+        gmock \
+        gtest \
+        gxx_linux-64 \
+        mock \
+        pytest \
+        pytest-cov \
+        python=${PYTHON_VERSION} \
+        unixodbc \
+        boost-cpp \
+        numpy$NUMPY_VERSION_RULE \
+        pyarrow$ARROW_VERSION_RULE \
+        pybind11 \
+        -c conda-forge
 
     RUN cd /opt && \
         wget -q https://github.com/pybind/pybind11/archive/v2.6.2.tar.gz && \
         tar xvf v2.6.2.tar.gz
-
-    # create a python virtualenv at /venv that contains the necessary build and test packages:
-    RUN python3 -m venv /venv && \
-        /venv/bin/pip install \
-            "numpy$NUMPY_VERSION_RULE" \
-            "pandas$PANDAS_VERSION_RULE" \
-            "pyarrow$ARROW_VERSION_RULE" \
-            pybind11==2.6.2 pytest mock pytest-cov
-
-    RUN pyarrow_path=`python -c 'import pyarrow; print(pyarrow.__path__[0])'` && \
-        pyarrow_so_version=`python -c 'import pyarrow; print(pyarrow.cpp_build_info.so_version)'` && \
-        ln -s $pyarrow_path/libarrow.so.${pyarrow_so_version} $pyarrow_path/libarrow.so && \
-        ln -s $pyarrow_path/libarrow_python.so.${pyarrow_so_version} $pyarrow_path/libarrow_python.so
 
 build:
     ARG PYTHON_VERSION=3.8.6
     ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
-    ARG PANDAS_VERSION_RULE=""
     FROM --build-arg CODE_NAME="$CODE_NAME" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
+        --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         +python
 
     COPY . /src
 
-    ENV ODBCSYSINI=/src/travis/odbc
+    ENV ODBCSYSINI=/src/earthly/odbc
     ENV TURBODBC_TEST_CONFIGURATION_FILES="query_fixtures_postgresql.json,query_fixtures_mssql.json,query_fixtures_mysql.json"
 
     RUN mkdir /src/build
     WORKDIR /src/build
     RUN ln -s /opt/pybind11-2.6.2 /src/pybind11
-    RUN cmake -DBUILD_COVERAGE=ON -DCMAKE_INSTALL_PREFIX=./dist -DPYBIND11_PYTHON_VERSION=`echo "$PYTHON_VERSION" | sed 's/\.[^\.]*$//'` -DDISABLE_CXX11_ABI=ON ..
-    RUN make -j4
-    RUN cmake --build . --target install
+    RUN bash -c ". $MINICONDA/etc/profile.d/conda.sh && \
+        conda activate turbodbc-dev && \
+        export UNIXODBC_INCLUDE_DIR=$CONDA_PREFIX/include && \
+        cmake -DBOOST_ROOT=$CONDA_PREFIX -DBUILD_COVERAGE=ON \
+            -DCMAKE_INSTALL_PREFIX=./dist  \
+            -DPYTHON_EXECUTABLE=/miniconda/envs/turbodbc-dev/bin/python \
+            -GNinja .. && \
+        ninja && \
+        cmake --build . --target install"
     SAVE ARTIFACT /src/build /build
 
 test:
@@ -114,72 +127,68 @@ test:
     ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
-    ARG PANDAS_VERSION_RULE=""
     FROM --build-arg CODE_NAME="$CODE_NAME" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
+        --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         +build
 
-    WITH DOCKER --compose ../earthly-docker-compose.yml
-        RUN /bin/bash -c "(r=10;while ! pg_isready --host=localhost --port=5432 --username=postgres ; do ((--r)) || exit; sleep 1 ;done)" && \
-            /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'SELECT @@VERSION' || sleep 10 && \
+    WITH DOCKER --compose ../earthly/docker-compose.yml
+        RUN /bin/bash -c "\
+            (r=20;while ! pg_isready --host=localhost --port=5432 --username=postgres ; do ((--r)) || exit; sleep 1 ;done) && \
+            (r=5;while ! /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'SELECT @@VERSION' ; do ((--r)) || exit; sleep 3 ;done) && \
+            sleep 5 && \
             /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'CREATE DATABASE test_db' && \
-            ctest --verbose
+            . $MINICONDA/etc/profile.d/conda.sh && \
+            conda activate turbodbc-dev && \
+            ctest --verbose \
+            "
     END
 
 test-python3.6:
-    ARG ARROW_VERSION_RULE="<2.0.0"
-
-    BUILD --build-arg CODE_NAME="bionic" \
-        --build-arg PYTHON_VERSION="3.6.12" \
-        --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
-        --build-arg NUMPY_VERSION_RULE="<1.20.0" \
-        --build-arg PANDAS_VERSION_RULE="<1.2.0" \
-        +test
-    BUILD --build-arg CODE_NAME="xenial" \
-        --build-arg PYTHON_VERSION="3.6.12" \
-        --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
-        --build-arg NUMPY_VERSION_RULE="<1.20.0" \
-        --build-arg PANDAS_VERSION_RULE="<1.2.0" \
-        +test
-
-test-python3.8:
+    ARG PYTHON_VERSION="3.6.12"
     ARG ARROW_VERSION_RULE="<2.0.0"
 
     BUILD --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="3.8.5" \
-        --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
-        --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
-        --build-arg PANDAS_VERSION_RULE=">=1.2.1" \
+        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+        --build-arg ARROW_VERSION_RULE="<2.0.0" \
+        --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test
-    BUILD --build-arg CODE_NAME="bionic" \
-        --build-arg PYTHON_VERSION="3.8.5" \
-        --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
+
+test-python3.8:
+    ARG PYTHON_VERSION="3.8.5"
+
+    BUILD --build-arg CODE_NAME="focal" \
+        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+        --build-arg ARROW_VERSION_RULE=">1,<2.0.0" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
-        --build-arg PANDAS_VERSION_RULE=">=1.2.1" \
         +test
+    BUILD --build-arg CODE_NAME="focal" \
+        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+        --build-arg ARROW_VERSION_RULE="<1.0.0" \
+        --build-arg NUMPY_VERSION_RULE="<1.20.0" \
+        +test
+    BUILD --build-arg CODE_NAME="focal" \
+        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+        --build-arg ARROW_VERSION_RULE=">=3.0.0" \
+        --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
+        +test
+
+test-all:
+    BUILD +test-python3.6
+    BUILD +test-python3.8
 
 docker:
     ARG PYTHON_VERSION=3.8.6
     ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
+    ARG NUMPY_VERSION_RULE="<1.20.0"
+
     FROM --build-arg CODE_NAME="$CODE_NAME" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
+        --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         +build
 
     ENTRYPOINT ["/bin/bash"]
     SAVE IMAGE turbodbc:latest
-
-docker-compose:
-    FROM +driver
-    COPY . /src
-
-    ENV ODBCSYSINI=/src/travis/odbc
-    ENV TURBODBC_TEST_CONFIGURATION_FILES="query_fixtures_postgresql.json"
-    WORKDIR /src
-
-    WITH DOCKER --compose earthly-docker-compose.yml
-        RUN /bin/bash -c "(r=10;while ! pg_isready --host=localhost --port=5432 --username=postgres ; do ((--r)) || exit; sleep 1 ;done)" && \
-            echo "dsf"
-    END
