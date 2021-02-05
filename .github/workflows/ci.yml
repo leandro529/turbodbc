@@ -14,11 +14,11 @@ jobs:
     strategy:
       matrix:
         target:
-          - pytohn3_6
-          - python3_8_arrow0xx
-          - python3_8_arrow1xx
-          - python3_8_arrow2xx
-          - python3_8_arrow3xx
+          - +test-python3.6
+          - +test-python3.8-arrow0.x.x
+          - +test-python3.8-arrow1.x.x
+          - +test-python3.8-arrow2.x.x
+          - +test-python3.8-arrow3.x.x
     steps:
       - uses: actions/checkout@v2
       - name: Download latest earthly
