@@ -55,6 +55,7 @@ python:
     ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
+    ARG CONDA_EXTRA=""
     FROM --build-arg CODE_NAME="$CODE_NAME" +docker-cache
 
     ENV MINICONDA_URL="https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh"
@@ -84,6 +85,7 @@ python:
         numpy$NUMPY_VERSION_RULE \
         pyarrow$ARROW_VERSION_RULE \
         pybind11 \
+        $CONDA_EXTRA \
         -c conda-forge
 
     RUN cd /opt && \
@@ -95,10 +97,12 @@ build:
     ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
+    ARG CONDA_EXTRA=""
     FROM --build-arg CODE_NAME="$CODE_NAME" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
         --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
+        --build-arg CONDA_EXTRA="$CONDA_EXTRA" \
         +python
 
     COPY . /src
@@ -123,12 +127,14 @@ build:
 test:
     ARG PYTHON_VERSION=3.8.6
     ARG CODE_NAME=focal
-    ARG ARROW_VERSION_RULE="<2.0.0"
+    ARG ARROW_VERSION_RULE=""
     ARG NUMPY_VERSION_RULE=""
+    ARG CONDA_EXTRA=""
     FROM --build-arg CODE_NAME="$CODE_NAME" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
         --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
+        --build-arg CONDA_EXTRA="$CONDA_EXTRA" \
         +build
 
     WITH DOCKER --compose ../earthly/docker-compose.yml
@@ -165,7 +171,7 @@ test-python3.8-arrow1.x.x:
     ARG PYTHON_VERSION="3.8.5"
     BUILD --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
-        --build-arg ARROW_VERSION_RULE=">1,<2" \
+        --build-arg ARROW_VERSION_RULE=">=1,<2" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test
 
@@ -173,7 +179,7 @@ test-python3.8-arrow2.x.x:
     ARG PYTHON_VERSION="3.8.5"
     BUILD --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
-        --build-arg ARROW_VERSION_RULE=">2,<3" \
+        --build-arg ARROW_VERSION_RULE=">=2,<3" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test
 
@@ -181,8 +187,16 @@ test-python3.8-arrow3.x.x:
     ARG PYTHON_VERSION="3.8.5"
     BUILD --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
-        --build-arg ARROW_VERSION_RULE=">3" \
+        --build-arg ARROW_VERSION_RULE=">=3" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
+        +test
+
+test-python3.8-arrow-nightly:
+    ARG PYTHON_VERSION="3.8.5"
+    BUILD --build-arg CODE_NAME="focal" \
+        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+        --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
+        --build-arg CONDA_EXTRA="-c arrow-nightlies" \
         +test
 
 test-python3.8-all:

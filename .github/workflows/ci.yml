@@ -19,6 +19,10 @@ jobs:
           - +test-python3.8-arrow1.x.x
           - +test-python3.8-arrow2.x.x
           - +test-python3.8-arrow3.x.x
+        experimental: [ false ]
+        include:
+          - target: +test-python3.8-arrow-nightly
+            experimental: true
     steps:
       - uses: actions/checkout@v2
       - name: Download latest earthly
@@ -27,3 +31,4 @@ jobs:
         run: earthly --version
       - name: Run build
         run: earthly --allow-privileged ${{ matrix.target }}
+        continue-on-error: ${{ matrix.experimental }}
