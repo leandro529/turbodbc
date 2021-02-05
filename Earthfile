@@ -150,78 +150,72 @@ test:
         (find . -name "*#c++#*" | xargs rm) || echo "error while removing stdlib files" \
         '
 
-    SAVE ARTIFACT ../python/turbodbc_test /cov/python
-    SAVE ARTIFACT ../gcov /cov/cpp
-    SAVE ARTIFACT /src/build/dist/dist /dist
+    SAVE ARTIFACT python_cov.xml /result/cov/python/python_cov.xml
+    SAVE ARTIFACT ../gcov /result/cov/cpp
+    SAVE ARTIFACT /src/build/dist/dist /result/dist
 
 test-python3.6:
     ARG PYTHON_VERSION="3.6.12"
     ARG ARROW_VERSION_RULE="<2.0.0"
 
-    BUILD --build-arg CODE_NAME="focal" \
+    COPY --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="<2.0.0" \
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
-        +test
+        +test/result /result
 
-    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
-    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /result AS LOCAL result
 
 test-python3.8-arrow0.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    BUILD --build-arg CODE_NAME="focal" \
+    COPY --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="<1" \
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
-        +test
+        +test/result /result
 
-    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
-    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /result AS LOCAL result
 
 test-python3.8-arrow1.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    BUILD --build-arg CODE_NAME="focal" \
+    COPY --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE=">=1,<2" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
-        +test
+        +test/result /result
 
-    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
-    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /result AS LOCAL result
 
 test-python3.8-arrow2.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    BUILD --build-arg CODE_NAME="focal" \
+    COPY --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE=">=2,<3" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
-        +test
+        +test/result /result
 
-    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
-    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /result AS LOCAL result
 
 test-python3.8-arrow3.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    BUILD --build-arg CODE_NAME="focal" \
+    COPY --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE=">=3" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
-        +test
+        +test/result /result
 
-    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
-    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /result AS LOCAL result
 
 
 test-python3.8-arrow-nightly:
     ARG PYTHON_VERSION="3.8.5"
-    BUILD --build-arg CODE_NAME="focal" \
+    COPY --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         --build-arg CONDA_EXTRA="-c arrow-nightlies" \
-        +test
+        +test/result /result
 
-    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
-    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /result AS LOCAL result/$EARTHLY_TARGET_NAME
 
 test-python3.8-all:
     BUILD test-python3.8-arrow0.x.x

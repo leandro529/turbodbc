@@ -37,29 +37,28 @@ jobs:
         run: earthly --allow-privileged ${{ matrix.target }}
         continue-on-error: ${{ matrix.experimental }}
 
-      # disable Python code coverage for now
-      # as it is unclear why no coverage report file is created during the test
-      # - name: Upload coverage for Python
-      #   if: ${{ matrix.upload }} == 'true'
-      #   uses: codecov/codecov-action@v1
-      #   with:
-      #     files: cov/python/coverage.xml
-      #     fail_ci_if_error: true
-      #     verbose: true
-      #     functionalities: gcov
-      - name: Upload coverage for C++
-        if: ${{ matrix.upload }} == 'true'
+      - name: Upload coverage for Python
+        if: ${{ matrix.upload }}
         uses: codecov/codecov-action@v1
         with:
-          directory: cov/cpp
+          files: result/cov/python/python_cov.xml
+          fail_ci_if_error: true
+          verbose: true
+          functionalities: gcov
+      - name: Upload coverage for C++
+        if: ${{ matrix.upload }}
+        uses: codecov/codecov-action@v1
+        with:
+          directory: result/cov/cpp
           fail_ci_if_error: true
           verbose: true
           functionalities: coveragepy, gcov
 
       - name: Publish package
-        if: ${{ matrix.upload }} == 'true' && env.IS_MASTER_BUILD == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && github.repository == 'blue-yonder/turbodbc'
+        if: matrix.upload && env.IS_MASTER_BUILD == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && github.repository == 'blue-yonder/turbodbc'
 
         uses: pypa/gh-action-pypi-publish@master
         with:
           user: __token__
           password: ${{ secrets.PYPI_UPLOAD }}
+          packages_dir: result/dist
