@@ -6,8 +6,6 @@ os-base:
     # set locale to utf-8, which is required for some odbc drivers (mysql);
     # also, set environment as set after 'source /venv/bin/activate'
     ENV LC_ALL=C.UTF-8
-    ENV VIRTUAL_ENV=/venv
-    ENV PATH=/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
     RUN apt-get update && apt-get upgrade -y && \
         apt-get install -y build-essential zlib1g-dev \
@@ -155,28 +153,47 @@ test-python3.6:
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test
 
-test-python3.8:
+test-python3.8-arrow0.x.x:
     ARG PYTHON_VERSION="3.8.5"
-
     BUILD --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
-        --build-arg ARROW_VERSION_RULE=">1,<2.0.0" \
-        --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
-        +test
-    BUILD --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
-        --build-arg ARROW_VERSION_RULE="<1.0.0" \
+        --build-arg ARROW_VERSION_RULE="<1" \
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test
+
+test-python3.8-arrow1.x.x:
+    ARG PYTHON_VERSION="3.8.5"
     BUILD --build-arg CODE_NAME="focal" \
         --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
-        --build-arg ARROW_VERSION_RULE=">=3.0.0" \
+        --build-arg ARROW_VERSION_RULE=">1,<2" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test
+
+test-python3.8-arrow2.x.x:
+    ARG PYTHON_VERSION="3.8.5"
+    BUILD --build-arg CODE_NAME="focal" \
+        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+        --build-arg ARROW_VERSION_RULE=">2,<3" \
+        --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
+        +test
+
+test-python3.8-arrow3.x.x:
+    ARG PYTHON_VERSION="3.8.5"
+    BUILD --build-arg CODE_NAME="focal" \
+        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+        --build-arg ARROW_VERSION_RULE=">3" \
+        --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
+        +test
+
+test-python3.8-all:
+    BUILD test-python3.8-arrow0.x.x
+    BUILD test-python3.8-arrow1.x.x
+    BUILD test-python3.8-arrow2.x.x
+    BUILD test-python3.8-arrow3.x.x
 
 test-all:
     BUILD +test-python3.6
-    BUILD +test-python3.8
+    BUILD +test-python3.8-all
 
 docker:
     ARG PYTHON_VERSION=3.8.6
