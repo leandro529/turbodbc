@@ -49,6 +49,48 @@ current state.
 Development version
 -------------------
 
+Earthly Setup
+^^^^^^^^^^^^^
+
+You can build turbodbc and run the full test suite with `earthly <https://earthly.dev>`_.
+
+See the install instructions on how to get earthly: `https://earthly.dev/get-earthly <https://earthly.dev/get-earthly>`_.
+
+Build turbodbc with the default arguments:
+
+::
+
+    earthly --allow-privileged +build
+
+build and run the tests for the default arguments:
+
+::
+
+    earthly --allow-privileged +test
+
+You can use the interactive mode to get a shell when tests fail:
+
+::
+
+    earthly -i --allow-privileged +test
+
+Run the full tests for different Python and package versions:
+
+::
+
+    earthly --allow-privileged +test-all
+
+Build and save a Docker image for development usage:
+
+::
+
+    earthly +docker
+
+To run specific test targets and arguments, like different python or pyarrow versions, please see the Earthfile.
+
+Manual Setup
+^^^^^^^^^^^^
+
 For developing new features or just sampling the latest version of turbodbc,
 do the following:
 

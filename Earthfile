@@ -4,7 +4,6 @@ os-base:
 
     ENV DEBIAN_FRONTEND=noninteractive
     # set locale to utf-8, which is required for some odbc drivers (mysql);
-    # also, set environment as set after 'source /venv/bin/activate'
     ENV LC_ALL=C.UTF-8
 
     RUN apt-get update && apt-get upgrade -y && \
@@ -39,24 +38,13 @@ driver:
     #     echo "\n[EXASOL]\nDriver=`ls /opt/EXA*/lib/linux/x86_64/libexaodbc-uo2214lv1.so`\nThreading=2\n" >> /etc/odbcinst.ini && \
     #     rm /opt/*.tar.gz
 
-docker-cache:
-    ARG CODE_NAME=focal
-    FROM --build-arg CODE_NAME="$CODE_NAME" \
-        +driver
-
-    # hack to cache the docker setup and the image pull so later steps based on the same OS have this already included
-    # this should be in sync with earth/docker-compose.yml
-    WITH DOCKER --pull postgres:11 --pull mysql:5.6 --pull mcr.microsoft.com/mssql/server:2017-latest
-        RUN echo ""
-    END
-
 python:
     ARG PYTHON_VERSION=3.8.6
     ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
     ARG CONDA_EXTRA=""
-    FROM --build-arg CODE_NAME="$CODE_NAME" +docker-cache
+    FROM --build-arg CODE_NAME="$CODE_NAME" +driver
 
     ENV MINICONDA_URL="https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh"
     RUN cd /opt && \
@@ -121,8 +109,11 @@ build:
             -DPYTHON_EXECUTABLE=/miniconda/envs/turbodbc-dev/bin/python \
             -GNinja .. && \
         ninja && \
-        cmake --build . --target install"
-    SAVE ARTIFACT /src/build /build
+        cmake --build . --target install && \
+        cd dist && \
+        python setup.py sdist \
+        "
+    SAVE ARTIFACT /src/build/dist/dist /dist
 
 test:
     ARG PYTHON_VERSION=3.8.6
@@ -148,6 +139,26 @@ test:
             ctest --verbose \
             "
     END
+
+    RUN /bin/bash -c '\
+        . $MINICONDA/etc/profile.d/conda.sh && \
+        conda activate turbodbc-dev && \
+        mkdir ../gcov && cd ../gcov && \
+        gcov -l -p `find ../build -name "*.gcda"` > /dev/null && \
+        echo "Removing coverage for boost and C++ standard library" && \
+        (find . -name "*#boost#*" | xargs rm) || echo "error while removing boost files" && \
+        (find . -name "*#c++#*" | xargs rm) || echo "error while removing stdlib files" \
+        '
+
+    SAVE ARTIFACT ../python/turbodbc_test /cov/python
+    SAVE ARTIFACT ../gcov /cov/cpp
+    SAVE ARTIFACT /src/build/dist/dist /dist
+
+test-save:
+    COPY +test/dist /dist
+    COPY +test/cov /cov
+    SAVE ARTIFACT /dist AS LOCAL dist
+    SAVE ARTIFACT /cov AS LOCAL cov
 
 test-python3.6:
     ARG PYTHON_VERSION="3.6.12"
@@ -204,6 +215,7 @@ test-python3.8-all:
     BUILD test-python3.8-arrow1.x.x
     BUILD test-python3.8-arrow2.x.x
     BUILD test-python3.8-arrow3.x.x
+    BUILD test-python3.8-arrow-nightly:
 
 test-all:
     BUILD +test-python3.6
@@ -221,5 +233,8 @@ docker:
         --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         +build
 
-    ENTRYPOINT ["/bin/bash"]
+    RUN echo ". $MINICONDA/etc/profile.d/conda.sh" >> ~/.bashrc
+    RUN echo "conda activate turbodbc-dev" >> ~/.bashrc
+    RUN apt-get install -y vim
+
     SAVE IMAGE turbodbc:latest

@@ -32,3 +32,40 @@ jobs:
       - name: Run build
         run: earthly --allow-privileged ${{ matrix.target }}
         continue-on-error: ${{ matrix.experimental }}
+
+  publish:
+    runs-on: ubuntu-20.04
+    needs:
+      - tests
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download latest earthly
+        run: "sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/download/v0.5.0/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'"
+      - name: Earthly version
+        run: earthly --version
+      - name: Run build
+        run: earthly --allow-privileged +test-save
+
+      - name: Upload coverage for Python
+        uses: codecov/codecov-action@v1
+        with:
+          files: cov/python/coverage.xml
+          fail_ci_if_error: true
+          verbose: true
+          functionalities: gcov
+      - name: Upload coverage for C++
+        uses: codecov/codecov-action@v1
+        with:
+          directory: cov/cpp
+          fail_ci_if_error: true
+          verbose: true
+          functionalities: coveragepy, gcov
+
+      - name: Publish package
+        if: env.IS_MASTER_BUILD == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && github.repository == 'blue-yonder/turbodbc'
+
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_UPLOAD }}
