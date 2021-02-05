@@ -154,12 +154,6 @@ test:
     SAVE ARTIFACT ../gcov /cov/cpp
     SAVE ARTIFACT /src/build/dist/dist /dist
 
-test-save:
-    COPY +test/dist /dist
-    COPY +test/cov /cov
-    SAVE ARTIFACT /dist AS LOCAL dist
-    SAVE ARTIFACT /cov AS LOCAL cov
-
 test-python3.6:
     ARG PYTHON_VERSION="3.6.12"
     ARG ARROW_VERSION_RULE="<2.0.0"
@@ -170,6 +164,9 @@ test-python3.6:
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test
 
+    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+
 test-python3.8-arrow0.x.x:
     ARG PYTHON_VERSION="3.8.5"
     BUILD --build-arg CODE_NAME="focal" \
@@ -177,6 +174,9 @@ test-python3.8-arrow0.x.x:
         --build-arg ARROW_VERSION_RULE="<1" \
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test
+
+    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
 
 test-python3.8-arrow1.x.x:
     ARG PYTHON_VERSION="3.8.5"
@@ -186,6 +186,9 @@ test-python3.8-arrow1.x.x:
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test
 
+    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+
 test-python3.8-arrow2.x.x:
     ARG PYTHON_VERSION="3.8.5"
     BUILD --build-arg CODE_NAME="focal" \
@@ -193,6 +196,9 @@ test-python3.8-arrow2.x.x:
         --build-arg ARROW_VERSION_RULE=">=2,<3" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test
+
+    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
 
 test-python3.8-arrow3.x.x:
     ARG PYTHON_VERSION="3.8.5"
@@ -202,6 +208,10 @@ test-python3.8-arrow3.x.x:
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test
 
+    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
+
+
 test-python3.8-arrow-nightly:
     ARG PYTHON_VERSION="3.8.5"
     BUILD --build-arg CODE_NAME="focal" \
@@ -209,6 +219,9 @@ test-python3.8-arrow-nightly:
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         --build-arg CONDA_EXTRA="-c arrow-nightlies" \
         +test
+
+    SAVE ARTIFACT /dist AS LOCAL dist/$EARTHLY_TARGET_NAME
+    SAVE ARTIFACT /cov AS LOCAL cov/$EARTHLY_TARGET_NAME
 
 test-python3.8-all:
     BUILD test-python3.8-arrow0.x.x
