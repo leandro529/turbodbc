@@ -8,8 +8,8 @@ os-base:
 
     RUN apt-get update && apt-get upgrade -y && \
         apt-get install -y build-essential zlib1g-dev \
-        wget unixodbc unixodbc-dev libboost-all-dev cmake g++ \
-        odbc-postgresql postgresql-client ninja-build gnupg apt-transport-https && \
+        wget unixodbc cmake g++ \
+        odbc-postgresql postgresql-client gnupg apt-transport-https && \
         apt-get clean
 
 driver:
