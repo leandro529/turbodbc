@@ -29,10 +29,8 @@ jobs:
             upload: false
     steps:
       - uses: actions/checkout@v2
-      - name: Download latest earthly
+      - name: Download earthly 5.0.0
         run: "sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/download/v0.5.0/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'"
-      - name: Earthly version
-        run: earthly --version
       - name: Run build
         run: earthly --allow-privileged ${{ matrix.target }}
         continue-on-error: ${{ matrix.experimental }}
