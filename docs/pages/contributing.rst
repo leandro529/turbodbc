@@ -98,10 +98,10 @@ with less overhead and with a mounted source code and build directory:
 
 This will give you a shell in a running container, there you can execute the different build steps as you wish:
 
-    * build setup: `cmake -DBOOST_ROOT=$CONDA_PREFIX -DBUILD_COVERAGE=ON -DCMAKE_INSTALL_PREFIX=./dist -DPYTHON_EXECUTABLE=/miniconda/envs/turbodbc-dev/bin/python -GNinja ..
-    * compile: `ninja`
-    * install: `cmake --build . --target install`
-    * unit tests: `ctest -E turbodbc_integration_test --verbose`
+* build setup: `cmake -DBOOST_ROOT=$CONDA_PREFIX -DBUILD_COVERAGE=ON -DCMAKE_INSTALL_PREFIX=./dist -DPYTHON_EXECUTABLE=/miniconda/envs/turbodbc-dev/bin/python -GNinja ..`
+* compile: `ninja`
+* install: `cmake --build . --target install`
+* unit tests: `ctest -E turbodbc_integration_test --verbose`
 
 To run the integration tests in this setup, it is required that the docker-compose setup is running:
 
