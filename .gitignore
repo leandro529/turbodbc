@@ -6,6 +6,9 @@ build_docker
 cmake-build-debug
 .coverage
 *.pyc
+.cache
+build
+pybind11
 
 PyTest/PyTest
 contrib/sdist

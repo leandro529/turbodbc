@@ -1,6 +1,5 @@
 os-base:
-    ARG CODE_NAME=focal
-    FROM ubuntu:$CODE_NAME
+    FROM condaforge/mambaforge:latest
 
     ENV DEBIAN_FRONTEND=noninteractive
     # set locale to utf-8, which is required for some odbc drivers (mysql);
@@ -11,10 +10,6 @@ os-base:
         wget unixodbc cmake g++ \
         odbc-postgresql postgresql-client gnupg apt-transport-https && \
         apt-get clean
-
-driver:
-    ARG CODE_NAME=focal
-    FROM --build-arg CODE_NAME="$CODE_NAME" +os-base
 
     # we need an mysql odbc driver for the integration tests
     # currently the test fail with a newer driver
@@ -40,30 +35,20 @@ driver:
 
 python:
     ARG PYTHON_VERSION=3.8.6
-    ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
     ARG CONDA_EXTRA=""
-    FROM --build-arg CODE_NAME="$CODE_NAME" +driver
+    FROM +os-base
 
-    ENV MINICONDA_URL="https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    RUN cd /opt && \
-        wget --no-verbose -O miniconda.sh $MINICONDA_URL && chmod +x miniconda.sh
-    ENV MINICONDA=$HOME/miniconda
-    RUN cd /opt && \
-        ./miniconda.sh -b -p $MINICONDA && \
-        . $MINICONDA/etc/profile.d/conda.sh && \
-        conda config --remove channels defaults && \
-        conda config --add channels conda-forge && \
-        conda create -y -q -n turbodbc-dev \
-        gcc_linux-64 \
+    RUN mamba create -y -q -n turbodbc-dev \
+        c-compiler \
         make \
         ninja \
         cmake \
         coveralls \
         gmock \
         gtest \
-        gxx_linux-64 \
+        cxx-compiler \
         mock \
         pytest \
         pytest-cov \
@@ -73,8 +58,10 @@ python:
         numpy$NUMPY_VERSION_RULE \
         pyarrow$ARROW_VERSION_RULE \
         pybind11 \
-        $CONDA_EXTRA \
-        -c conda-forge
+        $CONDA_EXTRA
+
+    RUN echo "conda activate turbodbc-dev" >> ~/.bashrc
+    RUN echo 'export UNIXODBC_INCLUDE_DIR=$CONDA_PREFIX/include' >> ~/.bashrc
 
     RUN cd /opt && \
         wget -q https://github.com/pybind/pybind11/archive/v2.6.2.tar.gz && \
@@ -82,31 +69,28 @@ python:
 
 build:
     ARG PYTHON_VERSION=3.8.6
-    ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE=""
     ARG CONDA_EXTRA=""
-    FROM --build-arg CODE_NAME="$CODE_NAME" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    FROM --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
         --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         --build-arg CONDA_EXTRA="$CONDA_EXTRA" \
         +python
 
     COPY . /src
+    # remove a potential available host build
+    RUN rm -rf /src/build && mkdir /src/build
+    WORKDIR /src/build
 
     ENV ODBCSYSINI=/src/earthly/odbc
     ENV TURBODBC_TEST_CONFIGURATION_FILES="query_fixtures_postgresql.json,query_fixtures_mssql.json,query_fixtures_mysql.json"
-
-    RUN mkdir /src/build
-    WORKDIR /src/build
     RUN ln -s /opt/pybind11-2.6.2 /src/pybind11
-    RUN bash -c ". $MINICONDA/etc/profile.d/conda.sh && \
-        conda activate turbodbc-dev && \
-        export UNIXODBC_INCLUDE_DIR=$CONDA_PREFIX/include && \
+
+    RUN bash -ic " \
         cmake -DBOOST_ROOT=$CONDA_PREFIX -DBUILD_COVERAGE=ON \
             -DCMAKE_INSTALL_PREFIX=./dist  \
-            -DPYTHON_EXECUTABLE=/miniconda/envs/turbodbc-dev/bin/python \
+            -DPYTHON_EXECUTABLE=`which python` \
             -GNinja .. && \
         ninja && \
         cmake --build . --target install && \
@@ -117,32 +101,26 @@ build:
 
 test:
     ARG PYTHON_VERSION=3.8.6
-    ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE=""
     ARG NUMPY_VERSION_RULE=""
     ARG CONDA_EXTRA=""
-    FROM --build-arg CODE_NAME="$CODE_NAME" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    FROM --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
         --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         --build-arg CONDA_EXTRA="$CONDA_EXTRA" \
         +build
 
     WITH DOCKER --compose ../earthly/docker-compose.yml
-        RUN /bin/bash -c "\
+        RUN /bin/bash -ic "\
             (r=20;while ! pg_isready --host=localhost --port=5432 --username=postgres ; do ((--r)) || exit; sleep 1 ;done) && \
             (r=5;while ! /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'SELECT @@VERSION' ; do ((--r)) || exit; sleep 3 ;done) && \
             sleep 5 && \
             /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'CREATE DATABASE test_db' && \
-            . $MINICONDA/etc/profile.d/conda.sh && \
-            conda activate turbodbc-dev && \
             ctest --verbose \
             "
     END
 
-    RUN /bin/bash -c '\
-        . $MINICONDA/etc/profile.d/conda.sh && \
-        conda activate turbodbc-dev && \
+    RUN /bin/bash -ic '\
         mkdir ../gcov && cd ../gcov && \
         gcov -l -p `find ../build -name "*.gcda"` > /dev/null && \
         echo "Removing coverage for boost and C++ standard library" && \
@@ -158,8 +136,7 @@ test-python3.6:
     ARG PYTHON_VERSION="3.6.12"
     ARG ARROW_VERSION_RULE="<2.0.0"
 
-    COPY --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    COPY ``--build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="<2.0.0" \
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test/result /result
@@ -168,8 +145,7 @@ test-python3.6:
 
 test-python3.8-arrow0.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    COPY --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    COPY --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="<1" \
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test/result /result
@@ -178,8 +154,7 @@ test-python3.8-arrow0.x.x:
 
 test-python3.8-arrow1.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    COPY --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    COPY --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE=">=1,<2" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test/result /result
@@ -188,8 +163,7 @@ test-python3.8-arrow1.x.x:
 
 test-python3.8-arrow2.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    COPY --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    COPY --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE=">=2,<3" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test/result /result
@@ -198,8 +172,7 @@ test-python3.8-arrow2.x.x:
 
 test-python3.8-arrow3.x.x:
     ARG PYTHON_VERSION="3.8.5"
-    COPY --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    COPY --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE=">=3" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         +test/result /result
@@ -209,8 +182,7 @@ test-python3.8-arrow3.x.x:
 
 test-python3.8-arrow-nightly:
     ARG PYTHON_VERSION="3.8.5"
-    COPY --build-arg CODE_NAME="focal" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    COPY --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg NUMPY_VERSION_RULE=">=1.20.0" \
         --build-arg CONDA_EXTRA="-c arrow-nightlies" \
         +test/result /result
@@ -230,19 +202,14 @@ test-all:
 
 docker:
     ARG PYTHON_VERSION=3.8.6
-    ARG CODE_NAME=focal
     ARG ARROW_VERSION_RULE="<2.0.0"
     ARG NUMPY_VERSION_RULE="<1.20.0"
 
-    FROM --build-arg CODE_NAME="$CODE_NAME" \
-        --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    FROM --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="$ARROW_VERSION_RULE" \
         --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         +build
 
-    RUN ln -s /opt/pybind11-2.6.2 /src/pybind11
-    RUN echo ". $MINICONDA/etc/profile.d/conda.sh" >> ~/.bashrc
-    RUN echo "conda activate turbodbc-dev" >> ~/.bashrc
     RUN apt-get install -y vim
 
     CMD ["/bin/bash"]
