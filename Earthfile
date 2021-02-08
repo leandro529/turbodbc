@@ -136,7 +136,7 @@ test-python3.6:
     ARG PYTHON_VERSION="3.6.12"
     ARG ARROW_VERSION_RULE="<2.0.0"
 
-    COPY ``--build-arg PYTHON_VERSION="$PYTHON_VERSION" \
+    COPY --build-arg PYTHON_VERSION="$PYTHON_VERSION" \
         --build-arg ARROW_VERSION_RULE="<2.0.0" \
         --build-arg NUMPY_VERSION_RULE="<1.20.0" \
         +test/result /result
