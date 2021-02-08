@@ -222,7 +222,7 @@ test-python3.8-all:
     BUILD test-python3.8-arrow1.x.x
     BUILD test-python3.8-arrow2.x.x
     BUILD test-python3.8-arrow3.x.x
-    BUILD test-python3.8-arrow-nightly:
+    BUILD test-python3.8-arrow-nightly
 
 test-all:
     BUILD +test-python3.6
@@ -240,8 +240,10 @@ docker:
         --build-arg NUMPY_VERSION_RULE="$NUMPY_VERSION_RULE" \
         +build
 
+    RUN ln -s /opt/pybind11-2.6.2 /src/pybind11
     RUN echo ". $MINICONDA/etc/profile.d/conda.sh" >> ~/.bashrc
     RUN echo "conda activate turbodbc-dev" >> ~/.bashrc
     RUN apt-get install -y vim
 
+    CMD ["/bin/bash"]
     SAVE IMAGE turbodbc:latest

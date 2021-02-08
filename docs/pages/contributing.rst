@@ -56,13 +56,7 @@ You can build turbodbc and run the full test suite with `earthly <https://earthl
 
 See the install instructions on how to get earthly: `https://earthly.dev/get-earthly <https://earthly.dev/get-earthly>`_.
 
-Build turbodbc with the default arguments:
-
-::
-
-    earthly --allow-privileged +build
-
-build and run the tests for the default arguments:
+Build and test turbodbc with the default arguments:
 
 ::
 
@@ -73,6 +67,15 @@ You can use the interactive mode to get a shell when tests fail:
 ::
 
     earthly -i --allow-privileged +test
+
+Run a specific test setup with an export of the build package:
+
+::
+
+    earthly -P test-python3.8-arrow3.x.x
+
+The coverage results as well as the build tar.gz for turbodbc can be found in the created `result` directory.
+To run other specific test targets and arguments, like different python or pyarrow versions, please see the Earthfile.
 
 Run the full tests for different Python and package versions:
 
@@ -86,12 +89,49 @@ Build and save a Docker image for development usage:
 
     earthly +docker
 
-To run specific test targets and arguments, like different python or pyarrow versions, please see the Earthfile.
+It will create and tag a docker image `turbodbc:latest` which can be used for IDEs or to run builds
+with less overhead and with a mounted source code and build directory:
 
-Manual Setup
-^^^^^^^^^^^^
+::
 
-For developing new features or just sampling the latest version of turbodbc,
+    docker run -v $PWD:/src -it turbodbc:latest
+
+This will give you a shell in a running container, there you can execute the different build steps as you wish:
+
+    * build setup: `cmake -DBOOST_ROOT=$CONDA_PREFIX -DBUILD_COVERAGE=ON -DCMAKE_INSTALL_PREFIX=./dist -DPYTHON_EXECUTABLE=/miniconda/envs/turbodbc-dev/bin/python -GNinja ..
+    * compile: `ninja`
+    * install: `cmake --build . --target install`
+    * unit tests: `ctest -E turbodbc_integration_test --verbose`
+
+To run the integration tests in this setup, it is required that the docker-compose setup is running:
+
+::
+
+    docker-compose -f earthly/docker-compose.yml up
+
+    # to stop it
+    docker-compose -f earthly/docker-compose.yml down
+
+
+Start the container within the host network stack:
+
+::
+
+    docker run -v $PWD:/src --network=host -it turbodbc:latest
+
+There you can run the integration tests:
+
+::
+
+    # the mssql database has to be created
+    /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'CREATE DATABASE test_db'
+
+    ctest --verbose
+
+Manual Host Native Setup
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+For developing new features or just sampling the latest version of turbodbc directly on your host
 do the following:
 
 #.  Make sure your development environment meets the prerequisites mentioned
@@ -129,11 +169,12 @@ do the following:
 
         git clone https://github.com/blue-yonder/turbodbc.git
 
-#.  ``cd`` into the git repo and pull in the ``pybind11`` submodule by running:
+#.  ``cd`` into the git repo and get ``pybind11``
 
     ::
 
-        git submodule update --init --recursive
+        wget -q https://github.com/pybind/pybind11/archive/v2.6.2.tar.gz
+        tar xvf v2.6.2.tar.gz
 
 #.  Create a build directory somewhere and ``cd`` into it.
 
