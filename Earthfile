@@ -88,9 +88,9 @@ build:
     RUN ln -s /opt/pybind11-2.6.2 /src/pybind11
 
     RUN bash -ic " \
-        cmake -DBOOST_ROOT=$CONDA_PREFIX -DBUILD_COVERAGE=ON \
+        cmake -DBOOST_ROOT=\${CONDA_PREFIX} -DBUILD_COVERAGE=ON \
             -DCMAKE_INSTALL_PREFIX=./dist  \
-            -DPYTHON_EXECUTABLE=`which python` \
+            -DPYTHON_EXECUTABLE=\$(which python) \
             -GNinja .. && \
         ninja && \
         cmake --build . --target install && \
