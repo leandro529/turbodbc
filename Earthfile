@@ -6,9 +6,7 @@ os-base:
     ENV LC_ALL=C.UTF-8
 
     RUN apt-get update && apt-get upgrade -y && \
-        apt-get install -y build-essential zlib1g-dev \
-        wget unixodbc cmake g++ \
-        odbc-postgresql postgresql-client gnupg apt-transport-https && \
+        apt-get install -y unixodbc odbc-postgresql postgresql-client gnupg apt-transport-https && \
         apt-get clean
 
     # we need an mysql odbc driver for the integration tests
@@ -113,7 +111,7 @@ test:
     WITH DOCKER --compose ../earthly/docker-compose.yml
         RUN /bin/bash -ic "\
             (r=20;while ! pg_isready --host=localhost --port=5432 --username=postgres ; do ((--r)) || exit; sleep 1 ;done) && \
-            (r=5;while ! /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'SELECT @@VERSION' ; do ((--r)) || exit; sleep 3 ;done) && \
+            (r=10;while ! /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'SELECT @@VERSION' ; do ((--r)) || exit; sleep 3 ;done) && \
             sleep 5 && \
             /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'StrongPassword1' -Q 'CREATE DATABASE test_db' && \
             ctest --verbose \
