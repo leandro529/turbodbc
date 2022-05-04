@@ -243,7 +243,7 @@ setup(
         "numpy>=1.18",
     ],
     install_requires=[],
-    extras_require={"arrow": ["pyarrow>=1.0,<7.1.0"], "numpy": "numpy>=1.19.0"},
+    extras_require={"arrow": ["pyarrow>=1.0,<7.1.0"], "numpy": "numpy>=1.18"},
     python_requires=">=3.8",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
